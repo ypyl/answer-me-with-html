@@ -3,16 +3,11 @@ name: answer-me-with-html
 argument-hint: "[config [key value] | clean | update]"
 description: >-
   Turns an answer into a one-page visual HTML explainer: the model writes a short Markdown draft and
-  the bundled CLI builds one page. Use it proactively and liberally, without being asked, whenever a
-  page would help the reader more than plain text, even if plain text would also work: any explanation
-  of how something works or how parts relate (flow, request path, architecture, code or folder
-  structure, state machine, lifecycle, history); any comparison, trade-off or decision with pros and
-  cons; any diagnosis, review or investigation, especially with several causes or findings to rank;
-  any answer with a table, a numbered or ranked list, steps, branches or several sections; or when the
-  user says "I don't get it / draw it / explain visually / 讲讲原理 / 没看懂 / 画个图". When in doubt, use it: a
-  page is quick and cheap to make. Also for explainer videos ("make a video", "做个视频") and for changing
-  its settings. Skip only for small talk, a trivial one-line answer, or when the user asks for plain
-  text.
+  the bundled CLI builds one page with diagrams, tables, charts and code. Use it when the user asks to
+  explain, draw, compare or review something and a page helps more than plain text, even unasked, or
+  when the user says "explain it in HTML", "draw it", "make a page", "explainer video", "讲讲原理",
+  "没看懂", "画个图". Also for changing its settings. Answer in plain text for small talk, a one-line
+  answer, or when the user asks for text.
 ---
 
 # Answer me with HTML: answer a complex question with one HTML page
@@ -23,9 +18,9 @@ Reply to the user, and write the draft, in the user's language.
 
 ## 0. When the user wants to change settings
 
-Arguments for this call: `$ARGUMENTS`
+The text after `/skill:answer-me-with-html` is this call's argument.
 
-When the arguments start with `config`, `clean` or `update`, or the user asks to change a setting, clean up pages or update this skill: read `${CLAUDE_SKILL_DIR}/references/settings.md` and follow it. That turn produces no page.
+When that text starts with `config`, `clean` or `update`, or the user asks to change a setting, clean up pages or update this skill: read `references/settings.md` (relative to this skill's directory) and follow it. That turn produces no page.
 
 ## 1. Decide: produce a page or not
 
@@ -39,7 +34,7 @@ Otherwise answer in plain text. When unsure: the more the question "needs a pict
 
 ### Always-on mode
 
-If the context contains the `[answer-me-with-html always-on]` reminder (the user added the always-on rule to a rules file such as `CLAUDE.md` or `AGENTS.md`), the bar is lower:
+If the context contains the `[answer-me-with-html always-on]` reminder (the user added the always-on rule to a rules file such as `~/.pi/agent/AGENTS.md` or `CLAUDE.md`), the bar is lower:
 
 - Whenever this turn gives a conclusion, summary, plan, comparison, review or explanation, attach a page.
 - Do not skip it because "the answer is short". If there is a conclusion, produce a page.
@@ -50,13 +45,15 @@ If the context contains the `[answer-me-with-html always-on]` reminder (the user
 
 ## 2. Workflow (one Bash call)
 
-The CLI is bundled in this skill's directory: `scripts/am.mjs`, a single file with no dependencies to install; it needs only Node.js 20+. If `node` is not found or is older than v20, tell the user, show them the exact command to install the Node.js LTS (macOS `brew install node`, Windows `winget install OpenJS.NodeJS.LTS`, otherwise nvm, which adds lines to the shell profile), and run it only after they agree, then check `node --version` again. If they say no or it still fails, stop and tell them. Below, `am` always means:
+The CLI is bundled in this skill's directory: `scripts/am.mjs`, a single file with no dependencies to install; it needs only Node.js 20+. If `node` is not found or is older than v20, tell the user, show them the exact command to install the Node.js LTS (macOS `brew install node`, Windows `winget install OpenJS.NodeJS.LTS`, otherwise nvm, which adds lines to the shell profile), and run it only after they agree, then check `node --version` again. If they say no or it still fails, stop and tell them. Below, `am` always means this skill's own copy of the CLI:
 
 ```bash
-node "${CLAUDE_SKILL_DIR}/scripts/am.mjs"
+node scripts/am.mjs
 ```
 
-In Claude Code, the path above is replaced with this skill's directory automatically. If you see the variable unreplaced (other agents), replace it with the absolute path of the directory that contains this SKILL.md. When the skill was loaded with a "Base directory for this skill" line (DeepSeek Harness), that path is this directory. If the user installed the `am` command globally, you can also use `am` directly.
+Run it from the directory that holds this SKILL.md: pi prints that path as `<location>`, and Claude Code passes it as `${CLAUDE_SKILL_DIR}`. If the shell is somewhere else, write the absolute path to `scripts/am.mjs` instead. If the user installed the `am` command globally, you can also use `am` directly.
+
+Two defaults surprise people in pi. `am render` opens a browser window unless the user turns that off (`am config set open off`); render with `--no-open` when the user does not want a window. The CLI also reads `package.json` from GitHub at most once a day to look for a new version; `am config set update_check off` stops that.
 
 Keep the default output; it needs no flag. If the session cannot write to `~/.answer-me-with-html/pages` (a sandbox that allows writes only in the workspace), the CLI saves the page in a private folder in the system temporary folder and says so on a `!` line; the system may clear that folder. Add `-o "<absolute-workspace-path>/.tmp/answers/topic.html"` to `render -` before the heredoc only when the user wants the page in the workspace or the render fails with `Cannot write the page`. `-o` names an HTML file, not a folder; the CLI creates missing parent directories. Use `AM_HOME` only when the whole data directory must move.
 
@@ -66,7 +63,7 @@ Keep the default output; it needs no flag. If the session cannot write to `~/.an
 3. Render in one go with a heredoc:
 
 ````bash
-node "${CLAUDE_SKILL_DIR}/scripts/am.mjs" render - <<'AM_EOF'
+node scripts/am.mjs render - <<'AM_EOF'
 ---
 title: Title
 ---
@@ -87,15 +84,13 @@ AM_EOF
    - `! Cleanup hint: …` or `! Update hint: …`: pass it on to the user in one sentence at the end of the reply, and ask whether to clean up / update. **Do not run am clean or the update command yourself**; wait until the user agrees. The CLI throttles these: the cleanup hint appears at most once every 7 days, the update hint at most once every 3 days.
 5. Reply in the terminal with only 2–3 lines: one core conclusion + the page link. Do not paste the draft or the HTML back into the terminal. Write this reply after the render, as the last step of the turn: render the page first, then reply. No tool call comes after the reply.
    If the render output has a `link:` line, the user runs `am serve`: use that URL as the page link instead, with the URL as the label too, and skip the local-file links below. Never start `am serve` yourself; only the user starts it.
-   Otherwise, in DeepSeek Harness, write a Markdown link directly to the absolute path from the `✓` line, with the path as the label too: `[C:/Users/Name/My Pages/page.html](<C:/Users/Name/My Pages/page.html>)` on Windows or `[/abs/path.html](</abs/path.html>)` on macOS/Linux. Use forward slashes on Windows and angle brackets around the destination so spaces work. These path links open the Document Preview panel.
-   In other hosts, write the page link as a Markdown link to a `file://` URL, with the URL as the label too: `[file:///abs/path.html](file:///abs/path.html)`. Take the absolute path from the `✓` line and add `file://` in front; do not percent-encode it. GUI hosts (Codex, Antigravity) render this as a clickable link, and a terminal still shows the full URL.
-   If you have a `present` tool (DeepSeek Harness), call it with the absolute path from the `✓` line before you reply, so the user can open the page from a card in the app. Still end the reply with the link.
-   If you have an in-app browser tool (such as `open_in_codex` in OpenAI Codex), the render output has a `link:` line, and `am config get open` is not `off`, call that tool with the link (`open_in_codex`: `target: { type: "browser", url: "<link>" }`) so the user sees the page in the app's browser panel. Still end the reply with the link.
+   Otherwise write the page link as a Markdown link to a `file://` URL, with the URL as the label too: `[file:///abs/path.html](file:///abs/path.html)`. Take the absolute path from the `✓` line and add `file://` in front; do not percent-encode it. pi renders this as a clickable link in the terminal, and a GUI host opens it in the browser.
+   If the host has an in-app browser tool or a `present` tool, call it with the absolute path from the `✓` line before you reply. Still end the reply with the link.
 
 When a page already exists and only one panel needs to change, do not rewrite the whole page. Take the source draft from the HTML's `#am-source`, replace only the matching `##` section, and overwrite the page in place:
 
 ````bash
-node "${CLAUDE_SKILL_DIR}/scripts/am.mjs" patch page.html --panel "Panel title" <<'AM_EOF'
+node scripts/am.mjs patch page.html --panel "Panel title" <<'AM_EOF'
 ## A Panel title
 New content
 AM_EOF
@@ -181,6 +176,7 @@ Every sentence on the page gives the reader one fact they need. The idea comes f
 - Write steps as commands, one action each, with the condition first: "If the build fails, read the log."
 - When you have not checked a fact, say so and say how to check it. Do not hide it behind "probably" or `可能`.
 - List every item, or say where the full list is. Do not end a list with "etc." or `等`.
+- If the user has a prose-editing skill installed, its rules win over this section. This section covers only what the checker measures.
 
 `am render` checks part of this and only warns by default (`style: 80`); with `style: strict` a draft that fails produces no page; `style: off` turns the check off. Each warning comes with its fix:
 
@@ -195,4 +191,4 @@ Every sentence on the page gives the reader one fact they need. The idea comes f
 
 Use only when the user explicitly asks for a video ("make a video", "explain it as a video", "3b1b style", "explainer video"). Do not produce a video unasked in always-on mode either.
 
-Before you write a video draft, read `${CLAUDE_SKILL_DIR}/references/video.md` and follow it.
+Before you write a video draft, read `references/video.md` and follow it.

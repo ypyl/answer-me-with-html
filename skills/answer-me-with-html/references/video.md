@@ -1,6 +1,6 @@
 # Explainer videos (am video, 3Blue1Brown style)
 
-Read this when SKILL.md section 7 sends you here. `am` means the full `node ".../scripts/am.mjs"` command from SKILL.md section 2; write the path out in full, because `${CLAUDE_SKILL_DIR}` is not replaced in this file.
+Read this when SKILL.md section 7 sends you here. `am` means the full `node scripts/am.mjs` command from SKILL.md section 2, run from this skill's directory; write the absolute path to `scripts/am.mjs` when the shell is somewhere else.
 
 A video draft has the same format as a page draft, with one extra rule: lines starting with `>` are narration, one beat per line.
 
